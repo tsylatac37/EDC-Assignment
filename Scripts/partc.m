@@ -1,6 +1,6 @@
 %% partc.m
 % Computes and plots the electric field and electrostatic potential 
-% for multiple applied voltages and outputs a tabulated list of parameters.
+% for multiple applied voltages and outputs an embedded data table.
 
 clear; clc; close all;
 
@@ -32,72 +32,71 @@ E0_max = -q * NA * xp_max / eps;
 x = linspace(-xmax, xmax, 2000);                
 x = sort([x, 0]);
 
-figure('Name', 'Part (c) Results', 'Color', 'w');
+% Make the figure wider to fit both the graphs and the table comfortably
+figure('Name', 'Part (c) Results', 'Color', 'w', 'Position', [100, 100, 1300, 600]);
 legend_labels = cell(1, 4);
 
-%% 3. Print Header & Loop Through Voltages
-% Dynamically format NA and ND to look like '1x10^15' instead of '1.00e+15'
+% Pre-allocate a cell array to hold our table data
+table_data = cell(4, 9);
+
+%% 3. Loop Through Voltages & Collect Data
+% Dynamically format NA and ND to look clean
 str_NA = sprintf('%gx10^%d', NA/10^floor(log10(NA)), floor(log10(NA)));
 str_ND = sprintf('%gx10^%d', ND/10^floor(log10(ND)), floor(log10(ND)));
-
-% Create the table header in the Command Window
-fprintf('\n================================================ PART (c) OUTPUT ================================================\n');
-fprintf('  V_A (V) | N_A (cm^-3) | N_D (cm^-3) | V_bi (V) | x_n (um) | x_p (um) |  W (um)  | E at x=0 (V/cm)| V at x=0 (V)\n');
-fprintf('-----------------------------------------------------------------------------------------------------------------\n');
 
 for n = 0:3
     VA = VA0 / (2^n);               
     legend_labels{n+1} = sprintf('V_A = %.2f V', VA);
-
+    
     % Recalculate parameters for this specific VA
     Vj = Vbi - VA;
     W  = sqrt(2 * eps * Vj / q * (1/NA + 1/ND));
     xn = W * NA / (NA + ND);
     xp = W * ND / (NA + ND);
-
+    
     E0 = -q * NA * xp / eps;
     V0 = q * NA * xp^2 / (2 * eps);
-
-    % Print the requested parameters for this iteration to the Command Window
-    % Multiply xn, xp, and W by 1e4 to display them clearly in micrometers (um)
-    fprintf('%9.2f | %11s | %11s | %8.4f | %8.3f | %8.3f | %8.3f | %14.0f | %12.4f\n', ...
-        VA, str_NA, str_ND, Vbi, xn*1e4, xp*1e4, W*1e4, E0, V0);
-
+    
+    % Store the formatted parameters in the table array instead of printing them
+    % Using round() to keep the table visually clean inside the UI
+    table_data(n+1, :) = {VA, str_NA, str_ND, round(Vbi,4), round(xn*1e4,3), round(xp*1e4,3), round(W*1e4,3), round(E0,0), round(V0,4)};
+    
     E = zeros(size(x));
     V = zeros(size(x));
-
+    
     Lp = (x >= -xp) & (x <= 0);
     Ln = (x > 0) & (x <= xn);
     Rn = (x > xn);
-
+    
     E(Lp) = -q * NA * (x(Lp) + xp) / eps;
     E(Ln) = -q * ND * (xn - x(Ln)) / eps;
-
+    
     V(Lp) = q * NA * (x(Lp) + xp).^2 / (2 * eps);
     V(Ln) = Vj - q * ND * (xn - x(Ln)).^2 / (2 * eps);
     V(Rn) = Vj;
-
-    % --- Plot Electric Field ---
-    subplot(2,1,1);
+    
+    % --- Plot Electric Field (Now on the left side) ---
+    subplot(2, 2, 1);
     hold on; 
     pE = plot(x * 1e4, E, 'LineWidth', 1.5);
     c = pE.Color; 
-
+    
     plot([-xp*1e4, xn*1e4], [0, 0], 'o', 'MarkerFaceColor', c, 'MarkerEdgeColor', c, 'MarkerSize', 5, 'HandleVisibility', 'off');
     plot(0, E0, 'o', 'MarkerFaceColor', c, 'MarkerEdgeColor', c, 'MarkerSize', 5, 'HandleVisibility', 'off');
-
-    % --- Plot Potential ---
-    subplot(2,1,2);
+    
+    % --- Plot Potential (Now on the bottom-left side) ---
+    subplot(2, 2, 3);
     hold on; 
     plot(x * 1e4, V, 'LineWidth', 1.5, 'Color', c);
-
+    
     plot(-xp*1e4, 0, 'o', 'MarkerFaceColor', c, 'MarkerEdgeColor', c, 'MarkerSize', 5, 'HandleVisibility', 'off');
     plot(0, V0, 'o', 'MarkerFaceColor', c, 'MarkerEdgeColor', c, 'MarkerSize', 5, 'HandleVisibility', 'off');
     plot(xn*1e4, Vj, 'o', 'MarkerFaceColor', c, 'MarkerEdgeColor', c, 'MarkerSize', 5, 'HandleVisibility', 'off');
 end
 
-%% 4. Apply Final Formatting
-subplot(2,1,1);
+%% 4. Apply Final Formatting & Embed Table
+% Format top-left graph
+subplot(2, 2, 1);
 xlim([-xmax xmax] * 1e4);
 ylim([1.1*E0_max 0]);
 grid on; box on;
@@ -106,10 +105,27 @@ ylabel('Electric field E (V/cm)');
 title(sprintf('Si pn step junction, T = 300 K: N_A = 10^{15} cm^{-3}, N_D = 2\\times10^{14} cm^{-3}'));
 legend(legend_labels, 'Location', 'best');
 
-subplot(2,1,2);
+% Format bottom-left graph
+subplot(2, 2, 3);
 xlim([-xmax xmax] * 1e4);
 ylim([0 1.1*Vj_max]);
 grid on; box on;
 xlabel('Position x (\mum)');
 ylabel('Potential V (V)');
 legend(legend_labels, 'Location', 'best');
+
+% Build and embed the table on the right side
+col_names = {'V_A (V)', 'N_A (cm^-3)', 'N_D (cm^-3)', 'V_bi (V)', 'x_n (um)', 'x_p (um)', 'W (um)', 'E_0 (V/cm)', 'V_0 (V)'};
+
+% Let MATLAB automatically size the columns to fit the header text perfectly
+col_widths = {'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto'};
+
+% Discard the restrictive subplot grid for the table. Use absolute normalized positioning
+% to force the table to take up the entire right half of the window cleanly.
+uit = uitable('Data', table_data, ...
+    'ColumnName', col_names, ...
+    'ColumnWidth', col_widths, ...
+    'Units', 'normalized', ...
+    'Position', [0.49, 0.11, 0.49, 0.815], ... % [left, bottom, width, height]
+    'RowName', [], ... 
+    'FontSize', 10);
